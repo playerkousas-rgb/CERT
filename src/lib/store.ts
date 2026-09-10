@@ -112,10 +112,9 @@ export function loadStore(): Store {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) {
+      // 全新使用者：不在此即時寫入（App 會先嘗試載入部署種子範本），稍後由自動儲存寫回
       const t = createTemplate('預設範本（橫向 A4）');
-      const s = { templates: [t], activeId: t.id };
-      saveStore(s);
-      return s;
+      return { templates: [t], activeId: t.id };
     }
     const parsed = JSON.parse(raw) as Store;
     const activeId = localStorage.getItem(ACTIVE_KEY);
@@ -203,23 +202,27 @@ export function exportBundle(templates: CertTemplate[]): void {
   URL.revokeObjectURL(url);
 }
 
+/** 把匯入的 JSON 文字正規化成新範本陣列（範本包或單一範本均可） */
+export function parseBundleJson(text: string): CertTemplate[] {
+  const obj = JSON.parse(text) as
+    | Partial<CertTemplate>
+    | { type?: string; templates?: Partial<CertTemplate>[] };
+  const list = Array.isArray((obj as { templates?: unknown[] }).templates)
+    ? (obj as { templates: Partial<CertTemplate>[] }).templates
+    : [obj as Partial<CertTemplate>];
+  if (!list.length || !list.some((t) => Array.isArray(t.fields))) {
+    throw new Error('檔案內找不到範本資料');
+  }
+  return list.map(normalizeTemplate);
+}
+
 /** 匯入範本包（或單一 .cert.json），回傳所有新範本 */
 export function parseBundleFile(file: File): Promise<CertTemplate[]> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => {
       try {
-        const obj = JSON.parse(r.result as string) as
-          | Partial<CertTemplate>
-          | { type?: string; templates?: Partial<CertTemplate>[] };
-        const list = Array.isArray((obj as { templates?: unknown[] }).templates)
-          ? (obj as { templates: Partial<CertTemplate>[] }).templates
-          : [obj as Partial<CertTemplate>];
-        if (!list.length || !list.some((t) => Array.isArray(t.fields))) {
-          reject(new Error('檔案內找不到範本資料'));
-          return;
-        }
-        resolve(list.map(normalizeTemplate));
+        resolve(parseBundleJson(r.result as string));
       } catch {
         reject(new Error('檔案格式不正確，應為 .cert-bundle.json 或 .cert.json'));
       }
@@ -228,6 +231,31 @@ export function parseBundleFile(file: File): Promise<CertTemplate[]> {
     r.readAsText(file);
   });
 }
+
+/**
+ * 把新範本合併進現有範本庫：
+ * 同名＝更新版面（保留本機校準值），不同名＝新增。回傳新範本庫。
+ */
+export function mergeTemplates(current: CertTemplate[], incoming: CertTemplate[]): CertTemplate[] {
+  const byName = new Map(current.map((t) => [t.name, t]));
+  const next = [...current];
+  for (const m of incoming) {
+    const old = byName.get(m.name);
+    if (old) {
+      const idx = next.findIndex((t) => t.id === old.id);
+      next[idx] = { ...m, id: old.id, calibration: old.calibration, updatedAt: Date.now() };
+    } else {
+      next.push(m);
+    }
+  }
+  return next;
+}
+
+// ── 部署預載（seed）：把「童軍證書範本包.cert-bundle.json」改名為
+// seed.cert-bundle.json 放進 public/ 後重新部署，所有新瀏覽器首次開啟即自動載入 ──
+export const STORE_KEY_PUBLIC = STORE_KEY;
+export const SEED_VERSION_KEY = 'scout-cert-seed-version-v1';
+export const SEED_VERSION = '1';
 
 // ─────────────────────────────────────────────────────────────
 // 資料解析：取得每一張證書、每個欄位最終要印的內容

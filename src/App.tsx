@@ -7,7 +7,8 @@ import DataStep from './components/steps/DataStep';
 import PrintStep from './components/steps/PrintStep';
 import {
   loadStore, saveStore, createTemplate, exportTemplate, parseTemplateFile,
-  exportBundle, parseBundleFile,
+  exportBundle, parseBundleFile, parseBundleJson, mergeTemplates,
+  STORE_KEY_PUBLIC, SEED_VERSION_KEY, SEED_VERSION,
 } from './lib/store';
 import { importDocx, docxResultToTemplatePatch } from './lib/docxImport';
 import type { CertField, CertTemplate, Calibration } from './types';
@@ -25,6 +26,39 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [saveError, setSaveError] = useState('');
   const saveTimer = useRef<number | null>(null);
+  // 首次開啟（完全未有範本庫）：成功載入種子包後直接取代空白預設範本
+  const freshRef = useRef(!localStorage.getItem(STORE_KEY_PUBLIC));
+
+  // 部署預載：網站內的 seed.cert-bundle.json 只在版本更新時自動載入一次
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (localStorage.getItem(SEED_VERSION_KEY) === SEED_VERSION) return;
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}seed.cert-bundle.json`, {
+          cache: 'no-cache',
+        });
+        if (res.ok) {
+          const incoming = parseBundleJson(await res.text());
+          if (incoming.length && !cancelled) {
+            setStore((s) =>
+              freshRef.current
+                ? { ...s, templates: incoming, activeId: incoming[0].id }
+                : { ...s, templates: mergeTemplates(s.templates, incoming) }
+            );
+            if (freshRef.current) setStep(3); // 開 App 即入「入資料」步驟
+          }
+        }
+      } catch {
+        // 沒有種子檔（預設情況）不報錯，維持空白範本
+      } finally {
+        if (!cancelled) localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 自動儲存（debounce，避免拖曳時頻繁寫入含大圖的 localStorage）
   useEffect(() => {
