@@ -7,6 +7,7 @@
 import JSZip from 'jszip';
 import type { CertField, CertTemplate, SourceColumn, TextAlign } from '../types';
 import { createField } from './store';
+import { downscaleDataURL } from './io';
 
 const EMU_PER_MM = 36000;
 const TWIP_PER_MM = 1440 / 25.4;
@@ -309,18 +310,22 @@ export async function importDocx(file: File): Promise<DocxImportResult> {
   // ── 全頁底圖 ──
   let bgImage: string | null = null;
   let bgName = '';
+  let bestArea = 0;
   for (const b of boxes) {
     if (!b.imagePath) continue;
     const area = b.imageW * b.imageH;
-    if (area > paperW * paperH * 0.45) {
+    if (area > paperW * paperH * 0.45 && area > bestArea) {
       const path = b.imagePath;
       const media = zip.file(path);
       if (media) {
+        bestArea = area;
         const blob = await media.async('base64');
         const ext = (path.split('.').pop() ?? 'png').toLowerCase();
         const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/' + ext;
-        bgImage = `data:${mime};base64,${blob}`;
-        bgName = path.split('/').pop() ?? 'word-image';
+        const raw = `data:${mime};base64,${blob}`;
+        // 全頁底圖通常很大，縮至 1700px JPEG 以慳儲存空間（對位參考用，72–150dpi 足夠）
+        bgImage = await downscaleDataURL(raw, 1700);
+        bgName = (path.split('/').pop() ?? 'word-image').replace(/\.[^.]+$/, '') + '.jpg';
       }
     }
   }
@@ -476,6 +481,7 @@ export function docxResultToTemplatePatch(r: DocxImportResult): Partial<CertTemp
     fields: r.fields,
     bgImage: r.bgImage,
     bgName: r.bgName,
+    setupDone: true,
     dataMode: 'excel',
     excelFileName: '',
     excelColumns: [],

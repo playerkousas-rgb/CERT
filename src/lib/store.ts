@@ -151,24 +151,77 @@ export function exportTemplate(t: CertTemplate): void {
   URL.revokeObjectURL(url);
 }
 
+/** 把匯入的 JSON 物件正規化成新範本（重新編 id、重設跟機的校準值） */
+function normalizeTemplate(obj: Partial<CertTemplate>): CertTemplate {
+  const base = createTemplate(obj.name || '匯入的範本');
+  return {
+    ...base,
+    ...obj,
+    id: uid(), // 匯入視為新範本，避免覆蓋
+    calibration: defaultCalibration(), // 校準值跟機／跟印表機，需重新校準
+    fields: (obj.fields ?? []).map((f) => ({ ...createField(), ...f })),
+    updatedAt: Date.now(),
+  } as CertTemplate;
+}
+
 export function parseTemplateFile(file: File): Promise<CertTemplate> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => {
       try {
         const obj = JSON.parse(r.result as string) as Partial<CertTemplate>;
-        const base = createTemplate(obj.name || '匯入的範本');
-        const tpl: CertTemplate = {
-          ...base,
-          ...obj,
-          id: uid(), // 匯入視為新範本，避免覆蓋
-          calibration: defaultCalibration(), // 校準值跟機／跟印表機，需重新校準
-          fields: (obj.fields ?? []).map((f) => ({ ...createField(), ...f })),
-          updatedAt: Date.now(),
-        } as CertTemplate;
-        resolve(tpl);
+        if (Array.isArray((obj as { templates?: unknown }).templates)) {
+          reject(new Error('這是範本包，請用左側「匯入範本包」一次過匯入'));
+          return;
+        }
+        resolve(normalizeTemplate(obj));
+      } catch (e) {
+        reject(e instanceof Error && e.message.includes('範本包')
+          ? e
+          : new Error('檔案格式不正確，應為 .cert.json 範本檔'));
+      }
+    };
+    r.onerror = () => reject(new Error('讀檔失敗'));
+    r.readAsText(file);
+  });
+}
+
+/** 一次過匯出全部範本（含官方 Word 匯入的位置與底圖），供其他電腦直接使用 */
+export function exportBundle(templates: CertTemplate[]): void {
+  const payload = {
+    type: 'cert-bundle',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    templates,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '童軍證書範本包.cert-bundle.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 匯入範本包（或單一 .cert.json），回傳所有新範本 */
+export function parseBundleFile(file: File): Promise<CertTemplate[]> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const obj = JSON.parse(r.result as string) as
+          | Partial<CertTemplate>
+          | { type?: string; templates?: Partial<CertTemplate>[] };
+        const list = Array.isArray((obj as { templates?: unknown[] }).templates)
+          ? (obj as { templates: Partial<CertTemplate>[] }).templates
+          : [obj as Partial<CertTemplate>];
+        if (!list.length || !list.some((t) => Array.isArray(t.fields))) {
+          reject(new Error('檔案內找不到範本資料'));
+          return;
+        }
+        resolve(list.map(normalizeTemplate));
       } catch {
-        reject(new Error('檔案格式不正確，應為 .cert.json 範本檔'));
+        reject(new Error('檔案格式不正確，應為 .cert-bundle.json 或 .cert.json'));
       }
     };
     r.onerror = () => reject(new Error('讀檔失敗'));

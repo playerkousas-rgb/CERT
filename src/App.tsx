@@ -7,8 +7,10 @@ import DataStep from './components/steps/DataStep';
 import PrintStep from './components/steps/PrintStep';
 import {
   loadStore, saveStore, createTemplate, exportTemplate, parseTemplateFile,
+  exportBundle, parseBundleFile,
 } from './lib/store';
-import type { CertField, CertTemplate } from './types';
+import { importDocx, docxResultToTemplatePatch } from './lib/docxImport';
+import type { CertField, CertTemplate, Calibration } from './types';
 import { FileText, MousePointer2, Database, Printer, AlertTriangle } from 'lucide-react';
 
 const STEPS = [
@@ -63,8 +65,10 @@ export default function App() {
   }
 
   function selectTemplate(id: string) {
+    const t = store.templates.find((x) => x.id === id);
     setStore((s) => ({ ...s, activeId: id }));
-    setStep(1);
+    // 已完成一次性設定的範本（官方 Word 匯入／欄位套）→ 直接入資料；否則入第一步設定
+    setStep(t?.setupDone ? 3 : 1);
   }
 
   function newTemplate() {
@@ -96,10 +100,89 @@ export default function App() {
     try {
       const t = await parseTemplateFile(file);
       setStore((s) => ({ ...s, templates: [...s.templates, t], activeId: t.id }));
-      setStep(1);
+      setStep(t.setupDone ? 3 : 1);
     } catch (e) {
       alert(e instanceof Error ? e.message : '匯入失敗');
     }
+  }
+
+  /** 一次性設定：一次過選全部官方 Word（可多選），每份證書建成一個就緒範本 */
+  async function importOfficialWord(files: File[]) {
+    const docs = files.filter((f) => /\.docx$/i.test(f.name));
+    if (docs.length === 0) {
+      alert('請選擇 .docx 檔；舊式 .doc 請先用 Word／WPS 另存為 .docx');
+      return;
+    }
+    const made: CertTemplate[] = [];
+    const errors: string[] = [];
+    for (const f of docs) {
+      try {
+        const r = await importDocx(f);
+        made.push({ ...createTemplate(r.name), ...docxResultToTemplatePatch(r) } as CertTemplate);
+      } catch (e) {
+        errors.push(`${f.name}：${e instanceof Error ? e.message : '解析失敗'}`);
+      }
+    }
+    if (made.length === 0) {
+      alert('全部檔案都讀取失敗：\n' + errors.join('\n'));
+      return;
+    }
+    setStore((s) => {
+      // 同名範本視為更新（保留已做的印表機校準），否則新增
+      const byName = new Map(s.templates.map((t) => [t.name, t]));
+      const next = [...s.templates];
+      let firstId = '';
+      for (const m of made) {
+        const old = byName.get(m.name);
+        if (old) {
+          const idx = next.findIndex((t) => t.id === old.id);
+          next[idx] = { ...m, id: old.id, calibration: old.calibration, updatedAt: Date.now() };
+          if (!firstId) firstId = old.id;
+        } else {
+          next.push(m);
+          if (!firstId) firstId = m.id;
+        }
+      }
+      return { ...s, templates: next, activeId: firstId };
+    });
+    setStep(3);
+    if (errors.length) alert('部分檔案讀取失敗：\n' + errors.join('\n'));
+  }
+
+  /** 匯入範本包（其他電腦匯出的全部範本） */
+  async function importBundle(file: File) {
+    try {
+      const incoming = await parseBundleFile(file);
+      setStore((s) => {
+        const byName = new Map(s.templates.map((t) => [t.name, t]));
+        const next = [...s.templates];
+        let firstId = '';
+        for (const m of incoming) {
+          const old = byName.get(m.name);
+          if (old) {
+            const idx = next.findIndex((t) => t.id === old.id);
+            // 範本包帶來的是別部機的位置／底圖；校準保留本機現有值
+            next[idx] = { ...m, id: old.id, calibration: old.calibration, updatedAt: Date.now() };
+            if (!firstId) firstId = old.id;
+          } else {
+            next.push(m);
+            if (!firstId) firstId = m.id;
+          }
+        }
+        return { ...s, templates: next, activeId: firstId };
+      });
+      setStep(3);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '範本包匯入失敗');
+    }
+  }
+
+  /** 同一部 printer：把目前校準值一鍵套用至全部範本 */
+  function applyCalibrationToAll(cal: Calibration) {
+    setStore((s) => ({
+      ...s,
+      templates: s.templates.map((t) => ({ ...t, calibration: cal, updatedAt: Date.now() })),
+    }));
   }
 
   return (
@@ -115,6 +198,9 @@ export default function App() {
           onDelete={deleteTemplate}
           onImport={importTemplate}
           onExport={() => active && exportTemplate(active)}
+          onImportWord={importOfficialWord}
+          onImportBundle={importBundle}
+          onExportBundle={() => exportBundle(store.templates.filter((t) => t.setupDone))}
         />
 
         <main className="flex-1 min-w-0 px-4 sm:px-6 py-5">
@@ -149,7 +235,14 @@ export default function App() {
 
           {active && (
             <>
-              {step === 1 && <PaperStep template={active} update={mutate} onNext={() => setStep(2)} />}
+              {step === 1 && (
+                <PaperStep
+                  template={active}
+                  update={mutate}
+                  onNext={() => setStep(2)}
+                  onBatchImport={importOfficialWord}
+                />
+              )}
               {step === 2 && (
                 <LayoutStep
                   template={active}
@@ -166,9 +259,17 @@ export default function App() {
                   patchField={patchField}
                   onNext={() => setStep(4)}
                   onBack={() => setStep(2)}
+                  onGoSetup={() => setStep(1)}
                 />
               )}
-              {step === 4 && <PrintStep template={active} update={mutate} onBack={() => setStep(3)} />}
+              {step === 4 && (
+                <PrintStep
+                  template={active}
+                  update={mutate}
+                  onBack={() => setStep(3)}
+                  onApplyCalToAll={applyCalibrationToAll}
+                />
+              )}
             </>
           )}
         </main>

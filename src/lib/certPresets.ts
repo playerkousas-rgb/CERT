@@ -403,6 +403,7 @@ export function applyPreset(preset: CertPreset): Partial<CertTemplate> {
     paperW: preset.paperW,
     paperH: preset.paperH,
     fields,
+    setupDone: true,
     dataMode: 'manual' as const,
     excelFileName: '',
     excelColumns: [],

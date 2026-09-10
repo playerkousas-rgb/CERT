@@ -68,6 +68,8 @@ export interface CertTemplate {
   /** 預印紙掃描圖（data URL），只作螢幕對位／連底圖列印用 */
   bgImage: string | null;
   bgName: string;
+  /** 一次性設定是否已完成（官方 Word 匯入或選用欄位套後為 true）；日常使用者可直接入資料列印 */
+  setupDone?: boolean;
   fields: CertField[];
   calibration: Calibration;
   /** 列印時是否連底圖一起印（印落預印紙應關閉；印普通紙打樣可開啟） */

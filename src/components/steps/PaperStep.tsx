@@ -22,10 +22,13 @@ export default function PaperStep({
   template,
   update,
   onNext,
+  onBatchImport,
 }: {
   template: CertTemplate;
   update: (patch: Partial<CertTemplate>) => void;
   onNext: () => void;
+  /** 一次過選多個官方 Word 時，交給 App 每個建成獨立範本 */
+  onBatchImport: (files: File[]) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const docxRef = useRef<HTMLInputElement>(null);
@@ -84,10 +87,10 @@ export default function PaperStep({
       const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       if (isPdf) {
         const { url } = await renderPdfFirstPage(file);
-        update({ bgImage: url, bgName: file.name });
+        update({ bgImage: url, bgName: file.name, setupDone: true });
       } else {
         const { url } = await scaledDataURL(file, 2000);
-        update({ bgImage: url, bgName: file.name });
+        update({ bgImage: url, bgName: file.name, setupDone: true });
       }
     } catch (e) {
       console.error(e);
@@ -137,10 +140,15 @@ export default function PaperStep({
                 ref={docxRef}
                 type="file"
                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleDocx(f);
+                  const fs = Array.from(e.target.files ?? []);
+                  if (fs.length > 1) {
+                    onBatchImport(fs);
+                  } else if (fs.length === 1) {
+                    handleDocx(fs[0]);
+                  }
                   e.target.value = '';
                 }}
               />
@@ -150,7 +158,7 @@ export default function PaperStep({
                 className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[#d4a853] to-[#b8860b] text-[#0a192f] text-xs font-bold hover:shadow-md hover:shadow-[#d4a853]/20 transition-all flex items-center justify-center gap-2"
               >
                 <FileUp className="w-4 h-4" />
-                {busy ? '讀取中…' : '一鍵匯入官方 Word 格式（.docx）'}
+                {busy ? '讀取中…' : '一鍵匯入官方 Word（.docx，可多選）'}
               </button>
               {docxMsg && (
                 <p className={`text-[11px] leading-relaxed rounded-lg p-2.5 ${docxMsg.startsWith('✓') ? 'bg-emerald-500/10 text-emerald-200/80' : docxMsg.includes('失敗') || docxMsg.includes('請使用') || docxMsg.includes('找不到') ? 'bg-red-500/10 text-red-200/90' : 'bg-[#d4a853]/5 text-white/50'}`}>

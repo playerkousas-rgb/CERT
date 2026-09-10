@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileSpreadsheet, PenLine, Link2, Table2, Plus, Trash2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, PenLine, Link2, Table2, Plus, Trash2, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { CertTemplate, CertField, DataMode } from '../../types';
 import { parseExcel, autoMapColumns } from '../../lib/excel';
 import { resolveRecord } from '../../lib/store';
@@ -7,18 +7,40 @@ import { Panel, Label, Select, Btn, StepHeader } from '../ui';
 import CertificatePage from '../CertificatePage';
 import ScaledPage from '../ScaledPage';
 
+/** 官方多分頁 Excel：按範本名稱自動揀最匹配的工作表（如「活動徽章證書格式」→「幼童軍活動徽章」） */
+function pickSheet(sheets: { name: string }[], templateName: string): number {
+  const bigrams = (s: string) => {
+    const n = s.replace(/[\s（）()、,，.／]/g, '');
+    const set = new Set<string>();
+    for (let i = 0; i < n.length - 1; i++) set.add(n.slice(i, i + 2));
+    return set;
+  };
+  const tn = bigrams(templateName);
+  let best = 0;
+  let bestScore = 0;
+  sheets.forEach((s, i) => {
+    const sn = bigrams(s.name);
+    let score = 0;
+    tn.forEach((b) => { if (sn.has(b)) score++; });
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  return bestScore > 0 ? best : 0;
+}
+
 export default function DataStep({
   template,
   update,
   patchField,
   onNext,
   onBack,
+  onGoSetup,
 }: {
   template: CertTemplate;
   update: (patch: Partial<CertTemplate>) => void;
   patchField: (id: string, patch: Partial<CertField>) => void;
   onNext: () => void;
   onBack: () => void;
+  onGoSetup: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +56,7 @@ export default function DataStep({
         setError('試算表內找不到資料，請確認第一列為欄位名稱');
         return;
       }
-      const active = sheets[0];
+      const active = sheets[pickSheet(sheets, template.name)];
       const mapping = autoMapColumns(template.fields, active.columns);
       const fields = template.fields.map((f) =>
         mapping[f.id] && !f.sourceColumns ? { ...f, sourceColumn: mapping[f.id] } : f
@@ -95,6 +117,22 @@ export default function DataStep({
   return (
     <div>
       <StepHeader title="第三步：匯入姓名與資料" subtitle="貼上 Excel 名單合併列印，或直接在表格輸入；每一列 = 一張證書" />
+
+      {!template.setupDone && (
+        <div className="max-w-3xl mx-auto mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3.5 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-300 flex-shrink-0" />
+          <div className="flex-1 text-xs leading-relaxed text-amber-100/90">
+            此範本尚未完成一次性設定（未有官方定位／底圖）。日常使用應先由負責人於
+            <b> 左側「一次過匯入官方 Word」</b>（可多選），或於第一步選用欄位套；否則欄位位置未必對準預印紙。
+          </div>
+          <button
+            onClick={onGoSetup}
+            className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-400/90 text-[#0a192f] text-xs font-bold hover:bg-amber-300 transition-colors"
+          >
+            前往第一步設定
+          </button>
+        </div>
+      )}
 
       {/* 分頁 */}
       <div className="flex justify-center mb-6">

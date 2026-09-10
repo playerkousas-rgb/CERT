@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Printer, ChevronLeft, ChevronRight, Crosshair, Info, FileDown, ShieldCheck,
-  ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, CheckCircle2,
+  ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, CheckCircle2, CopyCheck,
 } from 'lucide-react';
 import type { CertTemplate, Calibration } from '../../types';
 import { recordCount, resolveRecord } from '../../lib/store';
@@ -16,10 +16,13 @@ export default function PrintStep({
   template,
   update,
   onBack,
+  onApplyCalToAll,
 }: {
   template: CertTemplate;
   update: (patch: Partial<CertTemplate>) => void;
   onBack: () => void;
+  /** 同一部 printer：把目前校準值一鍵複製到全部範本 */
+  onApplyCalToAll: (cal: Calibration) => void;
 }) {
   const total = recordCount(template);
   const [index, setIndex] = useState(0);
@@ -30,6 +33,7 @@ export default function PrintStep({
   const [to, setTo] = useState(total);
   const [calOpen, setCalOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [appliedAll, setAppliedAll] = useState(false);
 
   // 資料筆數可能因範本／檔案切換而改變，直接 derive 安全索引與範圍
   const currentIndex = Math.min(index, total - 1);
@@ -201,6 +205,20 @@ export default function PrintStep({
                   <RotateCcw className="w-4 h-4" /> 重設
                 </Btn>
               </div>
+              {calActive && (
+                <button
+                  onClick={() => {
+                    onApplyCalToAll(cal);
+                    setAppliedAll(true);
+                    window.setTimeout(() => setAppliedAll(false), 2500);
+                  }}
+                  className="w-full py-2 rounded-lg border border-[#d4a853]/30 text-[#d4a853]/90 text-[11px] hover:bg-[#d4a853]/10 transition-all flex items-center justify-center gap-1.5"
+                  title="同一部印表機的修正相同，一鍵複製到全部證書範本，日後無須再校"
+                >
+                  <CopyCheck className="w-3.5 h-3.5" />
+                  {appliedAll ? '✓ 已套用到全部範本' : '把此校準套用至全部證書（同一部 printer 只校一次）'}
+                </button>
+              )}
             </div>
           </Panel>
 
