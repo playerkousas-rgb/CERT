@@ -1,73 +1,139 @@
-# React + TypeScript + Vite
+# 預印證書對位列印工具（童軍支部適用）
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+專為 Scout Shop 購買的**預印證書紙**而設：框、徽號已經印好在紙上，
+本工具負責把姓名、日期、編號、簽名等資料，**以毫米（mm）精準對位**印到預印紙上，
+並可一次過合併列印整批名單，或直接另存 PDF。
 
-Currently, two official plugins are available:
+- 純瀏覽器運作，**任何可上網的電腦（Windows / Mac、Chrome / Edge）打開網址即可用**，不依賴 Word
+- 位置、字型、字級全部以 **mm / pt 實體單位**定義，換機、換 Word 版本都不會走位
+- **印表機校準精靈**：印一張校準頁、用間尺量四角誤差，自動計算平移＋縮放修正；另可 ±0.1mm 微調
+- 每款證書（不同支部、不同類別）可各自儲存範本，**匯出 `.cert.json`** 分享給其他支部／電腦
+- **一鍵匯入官方 Word 合併列印檔（.docx）**：直接讀取 Word 文字方塊的 mm 座標、MERGEFIELD 合併欄、字型字級及全頁底圖，無須逐格手動對位（舊式 .doc 請先用 Word／WPS 另存 .docx）
+- Excel（.xlsx / .xls / .csv）合併列印，或直接在網頁表格輸入；**支援官方多分頁 Excel**（每款證書一個工作表，一鍵切換）
+- 支援簽名／印章透明 PNG 圖片欄位
+- 所有資料只存於自己的瀏覽器，沒有伺服器收集（.docx／.xlsx 亦全程在本機瀏覽器解析，不會上傳）
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 內建官方／常用證書欄位套
 
-## React Compiler
+總會只提供**幼童軍部分證書**的 Word 合併列印檔（05/2019，內含進度性徽章、活動徽章、
+童軍先修章、世界童軍環境章；[官方 Google Drive 下載](https://drive.google.com/open?id=1BiZP96vso5KOz7LoLVv8SWerz7jIX6Fy)），
+其他支部與證書類型並無涵蓋。本工具於第一步「證書類型」提供以下**欄位套**，
+按青少年活動通告（第 14/2016、37/2019 號及童軍支部 2023 簽發方法）之式樣，
+自動建立全部欄位（連印章、簽名圖片位），欄位名與官方 Excel 慣用欄名一致以便自動對應：
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 幼童軍：進度性徽章證書（幼童軍獎章／歷奇章／高級歷奇章）、活動徽章證書、童軍先修章證書、世界童軍環境章證書
+- 童軍：進度性獎章證書（探索／標準／高級）、服務／領導才獎章證書、專科徽章證書（興趣／技能／服務／教導組）
+- 深資童軍：**肩章證書**、段章證書（自立／責任／活動／探險）、金帶證書、其他徽章證書（海上／航空／社區參與／宗教／環境章）、深資訓練班／活動證書
+- 樂行童軍：**肩章證書**（與深資肩章為同一式樣）、訓練班／Moot／活動證書
+- 跨支部：宗教章證書
+- 一般：訓練班／活動參與證書（總會無提供格式時使用）、空白範本
 
-## Expanding the ESLint configuration
+> 注意：深資童軍獎章、榮譽童軍獎章（PT/19、PT/20）、樂行童軍獎章、貝登堡獎章（PT/21、PT/22、PT/69）
+> 的證書由**總會簽發**，旅團無須自行套印，故不在工具範圍內。
+> 深資肩章證書依 P31/2020 通告式樣整理；**樂行肩章證書與深資為同一式樣**（支部確認）。
+> 為免除 Word 版本／WPS／Google Docs 排版差異，一律以 mm 實際尺寸在瀏覽器統一排版。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+官方檔案連結已整合於第一步「官方檔案下載位置」面板，包括：
+支部官方檔案資料夾（全部 Word／Excel 與 p007/2023、p014/2016、**p031/2020**、p037/2019 通告）、
+幼童軍合併列印 ZIP（05/2019 Google Drive）、深資／樂行支部通告頁及總會表格總覽。
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 直接匯入官方 Word＋Excel（最推薦，完全免對位）
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+官方合併列印套件（05/2019）包含一份多分頁 Excel（幼童軍進度性徽章／活動徽章／童軍先修章／
+世界童軍環境章各一個工作表）及對應的 Word 格式檔。使用方法：
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. 第一步按「**一鍵匯入官方 Word 格式（.docx）**」，選擇該款證書的 Word 檔
+   （若下載回來是舊式 `.doc`，先用 Word／WPS「另存為 .docx」）。
+   工具會自動建立與 Word 完全相同位置、字級、粗斜的欄位，並把全頁式樣圖提取為對位底圖；
+   一個文字方塊內的中文＋英文等多個合併欄（MERGEFIELD）會自動組成同一欄位。
+2. 第三步上傳官方 Excel，頂部選擇對應的**工作表分頁**；欄位會按官方欄名（中文姓名、英文姓名、
+   旅團中文名稱、簽署人職位中文…）自動對應與組合，無須手動配對。
+3. 其餘步驟同上：白紙打樣 → 校準 → 正式印於預印紙。
+
+> 各欄位先放在 A4 橫向的常用位置；不同批次預印紙或有微差，掃描底圖上拖曳對正即可
+> （官方日期格式為**日／月／年**，例如 10/09/2026；證書編號通常置於左下角）。
+
+## 日常使用：選證書 → 入資料 → 列印（三步）
+
+定位、底圖等工夫由負責人**一次性**完成，其他使用者日常只需：
+
+1. 左側「證書範本庫」點選該款證書（已設定的範本會直接跳進入資料步驟）
+2. 貼上／上傳 Excel 名單（多分頁官方檔會按證書名稱自動選對分頁），或手動輸入
+3. 開啟列印（全部／指定範圍），或另存 PDF
+
+### 一次性設定（負責人，約 10 分鐘，整個支部只做一次）
+
+1. 左側按金色「**一次過匯入官方 Word**」，**一次過選取全部官方 .docx**（可多選），
+   每份證書自動建成一個含定位與底圖的就緒範本（舊式 .doc 先另存 .docx）
+2. 於任一範本第四步執行一次印表機校準（白紙打樣 → 校準精靈量度），
+   再按「**把此校準套用至全部證書**」——同一部 printer 無須逐款校
+3. 按左側「**匯出範本包分享**」產出 `.cert-bundle.json`，傳給其他電腦；
+   對方用「匯入範本包」即可使用（只須在自己的 printer 校準一次；校準值不會跨機攜帶）
+
+> 沒有官方 Word 的證書（深資／樂行、訓練班等）：第一步選內建欄位套或自行對位掃描底圖即可，
+> 完成後同樣會標記為就緒並包含在範本包內。
+
+## 進階使用流程（四步）
+
+0. （最推薦）於第一步直接「一鍵匯入官方 Word 格式（.docx）」；或於「證書類型」選擇欄位套，一鍵建立全部欄位。
+1. **紙張與底圖**：選紙張尺寸（預設橫向 A4），上傳預印紙的掃描本（JPG／PNG／PDF，建議 150–200 dpi）。
+   底圖只作螢幕對位參考，**正式列印時不會印出**。
+2. **欄位對位**：雙擊掃描本上的位置新增文字欄位（或拖曳現有欄位），設定字型、字級、顏色、粗體、對齊、自動換行闊度。
+   - 拖曳移動；選取後可用**方向鍵微調**（普通 1mm、Shift 10mm、Alt 0.1mm）
+   - 每個欄位可填「固定內容／預設值」（全批次相同，如活動名稱），或留待第三步由 Excel 填入
+3. **匯入資料**：上傳 Excel（第一列為欄位列名，例如「姓名、日期、證書編號」），系統自動對應欄位，可手動修正；
+   或選「手動輸入」逐張輸入。每一列 = 一張證書。
+4. **預覽與列印**：
+   - 先選「只印目前第 1 張」，用**白紙**測試；對光與預印紙重疊比對
+   - 有偏差就開「**校準精靈**」或用 ±0.1mm 微調，直至完全對位
+   - 滿意後選「全部」正式列印到預印紙；要存 PDF 就在列印對話框選「另存為 PDF」
+
+## 印表機／另存 PDF 對話框設定（非常重要）
+
+| 項目 | 設定 |
+| --- | --- |
+| 邊界 Margins | **無 None** |
+| 縮放 Scale | **100%／實際大小**（切勿選「配合頁面 / Fit to page」） |
+| 頁首頁尾 Headers & footers | **關閉** |
+| 雙面列印 | 關閉 |
+| 紙張尺寸／方向 | 與第一步一致（通常 A4 橫向；另存 PDF 時同樣要選 A4） |
+
+## 校準原理
+
+不同印表機的無法列印範圍與縮放略有差異。校準頁四角的 L 形標記理論距離紙邊 12mm，
+量度實際距離（左、頂、右、底四個數值）後，工具以最小平方方式計算出
+水平／垂直的平移（mm）及縮放（%）修正，列印時以 CSS transform 即時補償。
+每個範本獨立儲存自己的校準值（可理解為「每部印表機＋每款紙」一套）。
+
+## 部署給其他人：開網址即用，無須任何設定
+
+本工具採「**種子範本**」設計：`public/seed.cert-bundle.json` 會跟隨網站發布，
+任何人第一次打開網址，瀏覽器即自動載入全部證書範本，直接進入「入資料」步驟，
+**揀證書 → 入名單 → 列印**，無須匯入、無須安裝、無須 Word。
+
+- 現時種子檔已包含全部 16 款內建欄位套（位置為常用起始值，多數仍建議掃描底圖核對）。
+- 想使用者連對位都完全免做：負責人在自己瀏覽器用「一次過匯入官方 Word」建好
+  （含官方精確位置與底圖）、校準後，按左側「**匯出範本包分享**」，
+  把下載的檔案**改名為 `seed.cert-bundle.json` 放進 `public/` 取代原有檔案，
+  重新部署一次**即可；以後所有新使用者開網址便用該批官方定位範本。
+- 種子更新後只需把 `src/lib/store.ts` 內的 `SEED_VERSION` 遞增，舊使用者重開網站
+  亦會自動更新版面（其本機印表機校準值會保留）。
+
+```bash
+npm install
+npm run dev      # 開發
+npm run build    # 產生純靜態檔案於 dist/（含 seed.cert-bundle.json）
+npm run preview  # 本機預覽 build 成品
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`dist/` 為完全靜態檔案，可放到任何靜態網頁空間（GitHub Pages、內網伺服器、NAS、
+USB 手指）。注意：USB 雙擊 `index.html`（file://）下部分瀏覽器會限制 fetch，
+種子自動載入可能失效，此情況可改用「匯入範本包」一次；正式部署請用網址（http/https）。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+> 各使用者唯一可能要做的一步是**印表機校準**（每部 printer 一次，可一鍵套用至全部
+> 證書）；不校準通常只有 2–4mm 的整體平移（無邊界列印的噴墨機更接近 0），理論上只差少少。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 資料私隱
+
+掃描本、名單、簽名等全部只存在使用者瀏覽器的 localStorage，不會上傳到任何伺服器；
+清除瀏覽器資料前請先匯出 `.cert.json` 備份。
