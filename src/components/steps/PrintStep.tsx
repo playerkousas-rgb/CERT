@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Printer, ChevronLeft, ChevronRight, Crosshair, Info, FileDown,
+  Printer, ChevronLeft, ChevronRight, Crosshair, Info, FileDown, ShieldCheck,
   ArrowLeft, ArrowRight, ArrowUp, ArrowDown, RotateCcw, CheckCircle2,
 } from 'lucide-react';
 import type { CertTemplate, Calibration } from '../../types';
@@ -102,6 +102,14 @@ export default function PrintStep({
         <div className="space-y-4">
           <Panel title="列印／存 PDF">
             <div className="space-y-3">
+              <p className="text-[11px] leading-relaxed text-white/45 bg-white/[0.03] border border-white/10 rounded-lg p-2.5 flex items-start gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#d4a853]/80 flex-shrink-0 mt-0.5" />
+                <span>
+                  所有位置以 <b className="text-white/70">mm 實際尺寸</b>排版、字型由網頁統一載入，
+                  任何電腦用 Chrome／Edge 打開同一範本，版面都完全一樣，
+                  不受 Word 版本、WPS、Google Docs 或其他文書軟體的排版差異影響。
+                </span>
+              </p>
               <Btn variant="primary" className="w-full py-3.5 text-base" onClick={doPrint} disabled={printing}>
                 <Printer className="w-5 h-5" />
                 {printing ? '正在開啟列印視窗…' : '開啟列印（可選另存 PDF）'}

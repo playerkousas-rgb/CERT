@@ -54,6 +54,18 @@ const stampSign = (stampLabel: string) => [
   image('簽署', P.sign.x, P.sign.y),
 ];
 
+/** 深資／樂行肩章證書共用同一式樣（使用者確認兩者相同） */
+function epauletteFields(certNoSample = ''): PF[] {
+  return [
+    text('證書編號', 30, 186, { fontPt: 10, align: 'left', widthMm: 60, content: certNoSample }),
+    text('姓名（中文及英文）', 148, 96, { fontPt: 24, bold: true, widthMm: 190 }),
+    text('所屬旅團', 148, 116, { fontPt: 13, widthMm: 210 }),
+    text('頒發日期 日期 Date', 96, 176, { fontPt: 12, widthMm: 60, content: '15/9/2014' }),
+    ...stampSign('獲授權單位蓋印'),
+    text('獲授權人士姓名及職位', 146, 188, { fontPt: 11, widthMm: 100 }),
+  ];
+}
+
 export const CERT_PRESETS: CertPreset[] = [
   {
     key: 'blank',
@@ -247,16 +259,9 @@ export const CERT_PRESETS: CertPreset[] = [
     key: 'venture-epaulette',
     section: '深資童軍',
     label: '深資童軍肩章證書',
-    note: '依 P31/2020 第 5 節：肩章證書由總會、地域、童軍區或深資童軍團獲授權人士填妥、簽署及蓋印。',
+    note: '深資與樂行肩章證書為同一式樣。依 P31/2020 第 5 節：肩章證書由總會、地域、童軍區或深資童軍團獲授權人士填妥、簽署及蓋印。',
     paperW: 297, paperH: 210,
-    fields: [
-      text('證書編號', 30, 186, { fontPt: 10, align: 'left', widthMm: 60, content: 'VSE/01/13' }),
-      text('姓名（中文及英文）', 148, 96, { fontPt: 24, bold: true, widthMm: 190 }),
-      text('所屬旅團', 148, 116, { fontPt: 13, widthMm: 210 }),
-      text('頒發日期 日期 Date', 96, 176, { fontPt: 12, widthMm: 60, content: '15/9/2014' }),
-      ...stampSign('獲授權單位蓋印'),
-      text('獲授權人士姓名及職位', 146, 188, { fontPt: 11, widthMm: 100 }),
-    ],
+    fields: epauletteFields('VSE/01/13'),
   },
   {
     key: 'venture-bar',
@@ -327,17 +332,10 @@ export const CERT_PRESETS: CertPreset[] = [
   {
     key: 'rover-epaulette',
     section: '樂行童軍',
-    label: '樂行童軍肩章證書',
-    note: '樂行童軍肩章為支部入門要求；總會未設公開下載格式，此套依深資肩章式樣（P31/2020）類推，掃描實物後微調位置。',
+    label: '樂行童軍肩章證書（與深資同款）',
+    note: '樂行與深資肩章證書為同一式樣，欄位位置完全相同；憑簽妥蓋印的證書向 Scout Shop 購買肩章。',
     paperW: 297, paperH: 210,
-    fields: [
-      text('證書編號', 30, 186, { fontPt: 10, align: 'left', widthMm: 60 }),
-      text('姓名（中文及英文）', 148, 96, { fontPt: 24, bold: true, widthMm: 190 }),
-      text('所屬旅團', 148, 116, { fontPt: 13, widthMm: 210 }),
-      text('頒發日期 日期 Date', 96, 176, { fontPt: 12, widthMm: 60 }),
-      ...stampSign('獲授權單位蓋印'),
-      text('獲授權人士姓名及職位', 146, 188, { fontPt: 11, widthMm: 100 }),
-    ],
+    fields: epauletteFields(),
   },
   {
     key: 'rover-training',
